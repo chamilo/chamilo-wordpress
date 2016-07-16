@@ -3,6 +3,9 @@
  * Define a few constants
  */
 define('CHAMILO_WP_PUBLIC_IP', '');
+define('CHAMILO_SECRET_KEY', 1);
+define('CHAMILO_PERUSER_SIGNATURE', 2);
+define('CHAMILO_GLOBAL_SIGNATURE', 3);
 /**
  * Basic install/uninstall functions
  */
@@ -32,6 +35,11 @@ function chamilo_setting_url_callback_function() {
     echo "<input type='text' name='chamilo_setting_url' value='$setting' />";
 }
 
+function chamilo_setting_admin_callback_function() {
+    $setting = esc_attr( get_option( 'chamilo_setting_admin' ) );
+    echo "<input type='text' name='chamilo_setting_admin' value='$setting' />";
+}
+
 function chamilo_setting_key_callback_function() {
     $setting = esc_attr( get_option( 'chamilo_setting_key' ) );
     echo "<input type='text' name='chamilo_setting_key' value='$setting' />";
@@ -53,6 +61,14 @@ function chamilo_settings_api_init() {
     );
     register_setting('reading', 'chamilo_setting_url');
     add_settings_field(
+        'chamilo_setting_admin',
+        __( 'Chamilo\'s admin username', 'chamilo' ),
+        'chamilo_setting_admin_callback_function',
+        'reading',
+        'chamilo_connectivity_section'
+    );
+    register_setting('reading', 'chamilo_setting_admin');
+    add_settings_field(
         'chamilo_setting_key',
         __( 'Chamilo\'s security key', 'chamilo' ),
         'chamilo_setting_key_callback_function',
@@ -69,13 +85,14 @@ function chamilo_settings_api_init() {
 /**
  * Get data from Chamilo
  */
-function chamilo_get_courses($visibility) {
-    $signature = chamilo_get_signature();
-    $visibilities = array('public', 'public-registered');
-    error_log('Calling webservice');
-    $courses = chamilo_soap_call( 'courses_list', 'WSCourseList', $signature, $visibilities );
-    var_dump($courses);
-    error_log(print_r($courses, 1));
+function chamilo_get_courses($visibilities = array()) {
+    $signature = chamilo_get_signature(CHAMILO_GLOBAL_SIGNATURE);
+    $username = get_option('chamilo_setting_admin');
+    if (empty($visibilites)) {
+        $visibilities = 'public,public-registered';
+    }
+    $courses = chamilo_soap_call( 'courses_list', 'WSCourseList', 'admin', $signature, $visibilities );
+    return $courses;
 }
 
 function chamilo_soap_call() {
@@ -112,7 +129,7 @@ function chamilo_soap_call() {
     }
 }
 
-function chamilo_get_signature() {
+function chamilo_get_signature($type = CHAMILO_SECRET_KEY) {
     global $user;
     
     switch ($type) {
@@ -130,9 +147,9 @@ function chamilo_get_signature() {
             break;
         case CHAMILO_GLOBAL_SIGNATURE:
         default:
-            //$chamilo_user = variable_get('chamilo_user', '');
-            //$chamilo_apikey = variable_get('chamilo_appkey', '');
-            //return sha1($chamilo_user . $chamilo_apikey);
+            $chamilo_user = get_option( 'chamilo_setting_admin' );
+            $chamilo_apikey = get_option( 'chamilo_setting_key' );
+            return sha1($chamilo_user . $chamilo_apikey);
             return '';
     }
 }
@@ -147,5 +164,21 @@ function chamilo_get_course_visibilities() {
 }
 
 /**
- * Add blocks
+ * Add blocks / widgets
  */
+
+function chamilo_register_widgets() {
+    register_widget( 'ChamiloCoursesListWidget' );
+}
+
+function chamilo_display_courses_list($courses) {
+    $output = '';
+    if (is_array($courses) && !empty($courses)) {
+        $output .= '<ul>';
+        foreach ($courses as $course) {
+            $output .= '<li><a href="'.$course->url.'" target="_blank">'.utf8_decode($course->title).'</a> ('.$course->language.')</li>';
+        }
+        $output .= '</ul>';
+    }
+    echo $output;
+}

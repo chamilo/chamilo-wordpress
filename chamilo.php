@@ -24,6 +24,7 @@ any later version.
 */
 
 include __DIR__ . '/includes/chamilo-functions.php';
+include __DIR__ . '/includes/ChamiloCoursesListWidget.php';
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) ) {
         die;
@@ -41,3 +42,5 @@ add_action( 'admin_init', 'chamilo_settings_api_init' );
 //add_menu_page( 'options-general.php', __( 'ChamiloSettings' ), __( 'ChamiloSettings' ), 'manage_options', 'chamilo-submenu-handle', 'chamilo_menu' );
 
 add_shortcode( 'chamilo_courses_list', 'chamilo_get_courses' );
+
+add_action( 'widgets_init', 'chamilo_register_widgets' );
