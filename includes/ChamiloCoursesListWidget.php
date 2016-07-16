@@ -1,16 +1,12 @@
 <?php
-
 /**
- * Created by PhpStorm.
- * User: ywarnier
- * Date: 16/07/16
- * Time: 11:57
+ * Class defining a Chamilo widget for Chamilo 
  */
 class ChamiloCoursesListWidget extends WP_Widget
 {
     function __construct() {
         // Instantiate the parent object
-        parent::__construct( false, 'Chamilo Courses List widget' );
+        parent::__construct( false, 'Chamilo Courses list widget' );
     }
 
     function widget( $args, $instance ) {
