@@ -45,4 +45,4 @@ add_shortcode( 'chamilo_courses_list', 'chamilo_get_courses' );
 add_shortcode( 'chamilo_courses_list_by_user', 'chamilo_get_courses_by_user_display' );
 
 add_action( 'widgets_init', 'chamilo_register_widgets' );
-add_action('woocommerce_order_status_completed', 'chamilo_order_complete', 20, 1 );
+add_action( 'woocommerce_order_status_completed', 'chamilo_order_complete', 20, 1 );
