@@ -220,10 +220,9 @@ function chamilo_order_complete( $order_id ) {
     
   }
   
-  if (empty($courseCodeList) && empty($sessionList)) {
-            
-			//write_log( "Course code and sessionlist are empty, nothing to create" );
-            return true;
+  if (empty($courseCodeList) && empty($sessionList)) {   
+	//write_log( "Course code and sessionlist are empty, nothing to create" );
+        return true;
   }
   
   
@@ -241,169 +240,160 @@ function chamilo_order_complete( $order_id ) {
  
   
   // Check if the PS customer have already an account in Chamilo
-        $chamilo_params = array(
-            'original_user_id_name' => 'external_user_id',
-            //required, field name about original user id
-            'original_user_id_value' => $user_id,
-            //required, field value about original user id
-            'secret_key' => $finalKey
-            //required, secret key ("your IP address and security key from chamilo") encrypted with sha1
-        );
-  		
-  		$chamilo_user_data = chamilo_soap_call( 'registration', 'WSGetUser', $chamilo_params );
-  
-        //write_log($chamilo_user_data);
-        $chamilo_user_id = null;
-        if (!empty($chamilo_user_data)) {
-            $chamilo_user_id = $chamilo_user_data->user_id;
-        }
-  
-  
-  		// Login generation - firstname (30 len char) + PS customer id
-        
-        $login = substr(strtolower($username),0,30).$user_id;
-        // User does not have a Chamilo account we proceed to create it
-        if (empty($chamilo_user_id)) {
-            
-			//write_log( "Wordpress Customer does not exist in Chamilo proceed the creation of the Chamilo user" );
-            // Password generation
-            $password = $clean_password = generate_password();
-          	$encryption = 'sha1';
-            switch($encryption) {
-                case 'md5':
-                    $password = md5($password);
-                    break;
-                case 'sha1':
-                    $password = sha1($password);
-                    break;
-            }
+  $chamilo_params = array(
+    'original_user_id_name' => 'external_user_id',
+    //required, field name about original user id
+    'original_user_id_value' => $user_id,
+    //required, field value about original user id
+    'secret_key' => $finalKey
+    //required, secret key ("your IP address and security key from chamilo") encrypted with sha1
+  );
 
-            // Default account validity in chamilo.
-            $expirationDate = date('Y-m-d H:i:s', strtotime("+3660 days"));
+  $chamilo_user_data = chamilo_soap_call( 'registration', 'WSGetUser', $chamilo_params );
 
-            // Setting params
-            $chamilo_params =
-                array(
-                    'firstname' => $first_name,   // required
-                    'lastname' => $last_name,    // required
-                    'status' => '5',                    // required, (1 => teacher, 5 => learner)
-                    'email' => $user_email,       // optional, follow the same format (example@domain.com)
-                    'loginname' => $login,                 // required
-              		'official_code'=> $user_id,
-                    'password' => $password,              // required, it's important to define the salt into an extra field param
-                    'encrypt_method' => $encryption,  // required, check if the encrypt is the same than dokeos configuration
-                    'language' => 'brazilian',              // optional
-                    'phone' => '',                     // optional
-                    'expiration_date' => $expirationDate,  // optional, follow the same format
-                    'original_user_id_name' => 'external_user_id',  //required, field name about original user id
-                    'original_user_id_value' => $user_id,          //required, field value about original user id
-                    'secret_key' => $finalKey,                   //required, secret key ("your IP address and security key from chamilo") encrypted with sha1
+  $chamilo_user_id = null;
+	if (!empty($chamilo_user_data)) {
+    	$chamilo_user_id = $chamilo_user_data->user_id;
+  }
+
+
+  // Login generation - firstname (30 len char) + WP customer id
+
+  $login = substr(strtolower($username),0,30).$user_id;
+  // User does not have a Chamilo account we proceed to create it
+  if (empty($chamilo_user_id)) {
+
+	// write_log( "Wordpress Customer does not exist in Chamilo proceed the creation of the Chamilo user" );
+
+	// Password generation
+	$password = $clean_password = generate_password();
+	$encryption = 'sha1'; // Set the encryption of your chamilo platform
+	switch($encryption) {
+	case 'md5':
+	    $password = md5($password);
+	    break;
+	case 'sha1':
+	    $password = sha1($password);
+	    break;
+	}
+
+	// Default account validity in chamilo.
+	$expirationDate = date('Y-m-d H:i:s', strtotime("+3660 days"));
+
+	// Setting params
+    	$chamilo_params =
+		array(
+		    'firstname' => $first_name,   // required
+		    'lastname' => $last_name,    // required
+		    'status' => '5',                    // required, (1 => teacher, 5 => learner)
+		    'email' => $user_email,       // optional, follow the same format (example@domain.com)
+		    'loginname' => $login,                 // required
+			'official_code'=> $user_id,
+		    'password' => $password,              // required, it's important to define the salt into an extra field param
+		    'encrypt_method' => $encryption,  // required, check if the encrypt is the same than dokeos configuration
+		    'language' => '',              // optional
+		    'phone' => '',                     // optional
+		    'expiration_date' => $expirationDate,  // optional, follow the same format
+		    'original_user_id_name' => 'external_user_id',  //required, field name about original user id
+		    'original_user_id_value' => $user_id,          //required, field value about original user id
+		    'secret_key' => $finalKey,                   //required, secret key ("your IP address and security key from chamilo") encrypted with sha1
 					'extra' => array()
-                );
-			//write_log($chamilo_params);
-            // Creating a Chamilo user, calling the webservice
-          	$chamilo_user_id = chamilo_soap_call( 'registration', 'WSCreateUserPasswordCrypted', $chamilo_params);
-            
-
-            if (!empty($chamilo_user_id)) {
-              	//write_log( "User is subscribed" );
-                global $cookie;
-
-                /* Email generation */
-                $subject = get_bloginfo( 'name' ).' [Campus - Chamilo]';
-                $templateVars = array(
-                    '{firstname}' => $first_name,
-                    '{lastname}' => $last_name,
-                    '{email}' => $user_email,
-                    '{login}' => $login,
-                    '{password}' => $clean_password,
-                    '{chamilo_url}' => get_option('chamilo_setting_url'),
-                    '{site}' => get_bloginfo( 'name' ),
-                );
-
-                /* Email sending */
-
-              	$to = $user_email;
-                $body = $templateVars;
-                $headers[] = 'Content-Type: text/html; charset=UTF-8';
-				$headers[] = 'From: CBEPJUR <'.get_bloginfo( "admin_email" ).'>';
-                wp_mail( $to, $subject, $body, $headers );
-              
-              
-                
-            }else {
-                
-                    //write_log("Error to create user");
-                
-            }
-            
-          //write_log( "WSCreateUserPasswordCrypted was called this is the result: {$chamilo_user_id}" );
-        } else {
-             //write_log("User have already a chamilo account associated with the current Wordpress customer. Chamilo user_id = {$chamilo_user_id} ");
-
-            if (!empty($chamilo_user_id)) {
-                //write_log('User is subscribed');
-                global $cookie;
-
-                /* Email generation */
-                $subject = get_bloginfo( 'name' ).' [Campus - Chamilo]';
-                $templateVars = array(
-                    '{firstname}' => $first_name,
-                    '{lastname}' => $last_name,
-                    '{chamilo_url}' => get_option('chamilo_setting_url'),
-                    '{site}' => get_bloginfo( 'name' ),
-                );
-
-              
-                /* Email sending */
-                //write_log('Sending message already registered');
-              
-              	$to = $user_email;
-                $body = $templateVars;
-                $headers[] = 'Content-Type: text/html; charset=UTF-8';
-				$headers[] = 'From: CBEPJUR <'.get_bloginfo( "admin_email" ).'>';
-                $mailResult = wp_mail( $to, $subject, $body, $headers );
-				//write_log($mailResult);
-            }
-        }
+		);
+	  
+	// Creating a Chamilo user, calling the webservice
+	$chamilo_user_id = chamilo_soap_call( 'registration', 'WSCreateUserPasswordCrypted', $chamilo_params);
 
         if (!empty($chamilo_user_id)) {
-            foreach ($courseCodeList as $course_code) {
-                write_log("Subscribing user to the course: {$course_code} ");
-                //if ($this->debug) error_log('Chamilo user was registered with user_id = '.$chamilo_user_id);
-                $chamilo_params = array(
-                    'course' => trim($course_code),
-                    'user_id' => $chamilo_user_id,
-                  	'status' => STUDENT,
-                    'secret_key' => $finalKey
-                    //required, secret key ("your IP address and security key from chamilo") encrypted with sha1
-                );
-              
-              	$result = chamilo_soap_call( 'registration', 'WSSubscribeUserToCourseSimple', $chamilo_params );
-                
+		// write_log( "User is subscribed" );
+		global $cookie;
 
-            
-            }
+		/* Email generation */
+		$subject = get_bloginfo( 'name' ).' [Campus - Chamilo]';
+		$templateVars = array(
+		    '{firstname}' => $first_name,
+		    '{lastname}' => $last_name,
+		    '{email}' => $user_email,
+		    '{login}' => $login,
+		    '{password}' => $clean_password,
+		    '{chamilo_url}' => get_option('chamilo_setting_url'),
+		    '{site}' => get_bloginfo( 'name' ),
+		);
 
-            foreach ($sessionList as $sessionId) {
-                write_log("Subscribing user to the session: {$sessionId}");
+		/* Email sending */
 
-                $params = array(
-                    'session' => trim($sessionId),
-                    'user_id' => $chamilo_user_id,
-                  	'status' => STUDENT,
-                    'secret_key' => $finalKey
-                );
-				$result = chamilo_soap_call( 'registration', 'WSSubscribeUserToSessionSimple',$params);
-                
-            }
+		$to = $user_email;
+		$body = $templateVars;
+		$headers[] = 'Content-Type: text/html; charset=UTF-8';
+		$headers[] = 'From: CBEPJUR <'.get_bloginfo( "admin_email" ).'>';
+		wp_mail( $to, $subject, $body, $headers );
+
         } else {
-            write_log("Error while trying to create a Chamilo user : ".print_r($chamilo_params, 1).".");
-        }
-        
-        return true;
 
- 
+	    // write_log("Error to create user");
+
+        }
+
+	// write_log( "WSCreateUserPasswordCrypted was called this is the result: {$chamilo_user_id}" );
+  } else {
+	//write_log("User have already a chamilo account associated with the current Wordpress customer. Chamilo user_id = {$chamilo_user_id} ");
+
+	if (!empty($chamilo_user_id)) {
+		//write_log('User is subscribed');
+		global $cookie;
+
+		/* Email generation */
+		$subject = get_bloginfo( 'name' ).' [Campus - Chamilo]';
+		$templateVars = array(
+		    '{firstname}' => $first_name,
+		    '{lastname}' => $last_name,
+		    '{chamilo_url}' => get_option('chamilo_setting_url'),
+		    '{site}' => get_bloginfo( 'name' ),
+		);
+
+
+		/* Email sending */
+		//write_log('Sending message already registered');
+
+		$to = $user_email;
+		$body = $templateVars;
+		$headers[] = 'Content-Type: text/html; charset=UTF-8';
+				$headers[] = 'From: CBEPJUR <'.get_bloginfo( "admin_email" ).'>';
+		$mailResult = wp_mail( $to, $subject, $body, $headers );
+	}
+  }
+
+  if (!empty($chamilo_user_id)) {
+	foreach ($courseCodeList as $course_code) {
+		write_log("Subscribing user to the course: {$course_code} ");
+		//if ($this->debug) error_log('Chamilo user was registered with user_id = '.$chamilo_user_id);
+		$chamilo_params = array(
+		    'course' => trim($course_code),
+		    'user_id' => $chamilo_user_id,
+			'status' => STUDENT,
+		    'secret_key' => $finalKey
+		    //required, secret key ("your IP address and security key from chamilo") encrypted with sha1
+		);
+
+		$result = chamilo_soap_call( 'registration', 'WSSubscribeUserToCourseSimple', $chamilo_params );
+	}
+
+	foreach ($sessionList as $sessionId) {
+		// write_log("Subscribing user to the session: {$sessionId}");
+
+		$params = array(
+		    'session' => trim($sessionId),
+		    'user_id' => $chamilo_user_id,
+			'status' => STUDENT,
+		    'secret_key' => $finalKey
+		);
+		$result = chamilo_soap_call( 'registration', 'WSSubscribeUserToSessionSimple',$params);
+
+	}
+  } else {
+	// write_log("Error while trying to create a Chamilo user : ".print_r($chamilo_params, 1).".");
+  }
+
+return true;
 }
 
 function generate_password($length = 8)
