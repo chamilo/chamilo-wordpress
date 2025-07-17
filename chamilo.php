@@ -29,7 +29,8 @@ include __DIR__ . '/includes/ChamiloCoursesListWidget.php';
 if ( ! defined( 'WPINC' ) ) {
         die;
 }
-
+// Modif Nicolas
+// Nouvelle modif
 //Calling hooks
 register_activation_hook( __FILE__, 'chamilo_install' );
 register_deactivation_hook( __FILE__, 'chamilo_deactivation' );
