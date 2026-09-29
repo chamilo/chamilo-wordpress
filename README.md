@@ -4,9 +4,6 @@ Sells Chamilo courses and sessions through WooCommerce. Pulls a catalog from a
 Chamilo v3 portal into WooCommerce products, and enrolls the buyer in Chamilo
 automatically once their order completes.
 
-Full technical design and rationale: `WORDPRESS_STOREFRONT_PLUGIN_PLAN.md`, in the
-Chamilo repository (`chamilo/chamilo-lms`, `master` branch) - every non-obvious
-decision in this plugin's code comments points back to a section of that plan.
 See `CHANGELOG.md` for what changed between released versions.
 
 ## Requirements
@@ -14,7 +11,7 @@ See `CHANGELOG.md` for what changed between released versions.
 - WordPress 6.9+
 - WooCommerce 8.0+ (for HPOS support)
 - PHP 8.2+
-- A Chamilo v3 portal (see Part A below for one-time setup on that side)
+- A Chamilo v3.1+ portal (see Part A below for one-time setup on that side)
 
 ## What it does
 
