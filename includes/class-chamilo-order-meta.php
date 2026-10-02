@@ -73,16 +73,41 @@ class Chamilo_Order_Meta
 	}
 
 	/**
-	 * True when this line item is a product this plugin manages — the only kind
-	 * Chamilo_Enrollment should ever act on.
+	 * What Chamilo course/session this line item's product was synced from, read
+	 * straight from the product's own `_chamilo_course_id` / `_chamilo_session_id`
+	 * meta — the sync's actual record of "this came from Chamilo" — rather than
+	 * from WooCommerce's `product_type` term / PHP class, which can silently go
+	 * stale (e.g. an admin saving the product edit screen posts type "simple").
+	 *
+	 * @return array{type: 'course'|'session', id: int}|null
+	 */
+	public static function resolve_target(WC_Order_Item_Product $item): ?array
+	{
+		$product_id = $item->get_product_id();
+		if ($product_id <= 0) {
+			return null;
+		}
+
+		$course_id = (int) get_post_meta($product_id, '_chamilo_course_id', true);
+		if ($course_id > 0) {
+			return ['type' => 'course', 'id' => $course_id];
+		}
+
+		$session_id = (int) get_post_meta($product_id, '_chamilo_session_id', true);
+		if ($session_id > 0) {
+			return ['type' => 'session', 'id' => $session_id];
+		}
+
+		return null;
+	}
+
+	/**
+	 * True when this line item is a product synced from Chamilo — the only kind
+	 * Chamilo_Enrollment should ever act on. Independent of the product's
+	 * WooCommerce type (see resolve_target()).
 	 */
 	public static function is_chamilo_item(WC_Order_Item_Product $item): bool
 	{
-		$product = $item->get_product();
-		if (!$product instanceof WC_Product) {
-			return false;
-		}
-
-		return in_array($product->get_type(), ['chamilo_course', 'chamilo_session'], true);
+		return null !== self::resolve_target($item);
 	}
 }

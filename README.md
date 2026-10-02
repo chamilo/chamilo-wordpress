@@ -280,18 +280,17 @@ failed for ...` or `[Chamilo] media_handle_sideload failed for ...` lines (requi
 `WP_DEBUG` on), and confirm the **"Image locked from Chamilo sync"** checkbox
 isn't checked on the product (a locked image is never touched by sync, by design).
 
-**A real order for a synced course/session shows "No Chamilo products in this
-order" in the Chamilo enrollment box, even though the customer clearly bought
-one.** This means WooCommerce loaded that product as a plain product, not as the
-`chamilo_course`/`chamilo_session` type it should be. `debug.log` (with `WP_DEBUG`
-on) shows this as `product_type=simple, is_chamilo_item=false` for the order's
-item, followed by a second line confirming whether that product still carries
-Chamilo meta (`_chamilo_course_id`/`_chamilo_session_id`) — if it does, this is
-exactly this bug, not a genuinely unrelated product. Re-run **Sync now** - every
-sync re-affirms the correct product type unconditionally - then reload the
-affected order; the sidebar box should now recognize the item and offer **Retry
-enrollment**, which will retroactively resolve/create the buyer's Chamilo account
-and enroll them for that same order.
+**A product's Chamilo fields (the "Chamilo details" box, the price/image lock
+checkboxes) are missing from its edit screen.** WooCommerce's product-type
+selector only knows its own types, so saving a synced product from the edit
+screen posts "simple" and resets the product's type. The plugin restores it
+automatically (after that save, when the edit screen is opened, on every order
+and at the end of every sync) and shows a notice when it does; reload the screen
+if the fields are still missing. Enrollment never depended on this: an order item
+is recognized as a Chamilo course/session from the product's own Chamilo meta, not
+from its WooCommerce type. `debug.log` (with `WP_DEBUG` on) shows
+`chamilo target=course #N` for each order item and a "stale ... repaired" line
+when a repair happened.
 
 **"Sync now" says "Request failed" / a fatal error mentions "Invalid or duplicated
 SKU."** WooCommerce requires every product's SKU to be unique store-wide. The

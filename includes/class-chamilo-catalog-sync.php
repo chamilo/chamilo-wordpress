@@ -181,6 +181,14 @@ class Chamilo_Catalog_Sync
 			}
 		}
 
+		// Validation pass over every product carrying Chamilo meta, including ones no
+		// longer returned by Chamilo (e.g. a visibility since unchecked) that the
+		// per-item loops above never touched.
+		$repaired = self::repair_all_product_type_terms();
+		if ($repaired > 0 && defined('WP_DEBUG') && WP_DEBUG) {
+			error_log(sprintf('[Chamilo] sync validation: repaired the product_type term of %d product(s)', $repaired));
+		}
+
 		update_option('chamilo_wp_last_sync_at', current_time('mysql'));
 		update_option('chamilo_wp_last_sync_status', sprintf(
 			/* translators: 1: courses synced, 2: sessions synced, 3: failure summary (empty if none) */
@@ -546,6 +554,32 @@ class Chamilo_Catalog_Sync
 	private static function force_product_type_term(WC_Product $product): void
 	{
 		wp_set_object_terms($product->get_id(), [$product->get_type()], 'product_type');
+	}
+
+	private static function repair_all_product_type_terms(): int
+	{
+		$ids = get_posts([
+			'post_type' => 'product',
+			'post_status' => 'any',
+			'numberposts' => -1,
+			'fields' => 'ids',
+			'cache_results' => false,
+			'suppress_filters' => true,
+			'meta_query' => [ // phpcs:ignore WordPress.DB.SlowDBQuery
+				'relation' => 'OR',
+				['key' => '_chamilo_course_id', 'compare' => 'EXISTS'],
+				['key' => '_chamilo_session_id', 'compare' => 'EXISTS'],
+			],
+		]);
+
+		$repaired = 0;
+		foreach ($ids as $id) {
+			if (Chamilo_Product_Types::repair_product_type_term((int) $id)) {
+				++$repaired;
+			}
+		}
+
+		return $repaired;
 	}
 
 	private static function log_item_failure(string $kind, int $chamilo_id, \Throwable $e): string

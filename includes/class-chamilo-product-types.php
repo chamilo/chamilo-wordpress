@@ -57,6 +57,87 @@ class Chamilo_Product_Types
 		add_action('woocommerce_product_options_general_product_data', [self::class, 'render_lock_fields']);
 		add_action('woocommerce_process_product_meta', [self::class, 'save_lock_fields']);
 		add_action('add_meta_boxes', [self::class, 'add_info_meta_box'], 10, 2);
+
+		// WooCommerce's product-type select only offers its own types, so saving a
+		// synced product from the edit screen posts "simple" and overwrites the
+		// product_type term. Re-assert it after that save, and repair any product
+		// found stale when its edit screen is opened.
+		add_action('woocommerce_process_product_meta', [self::class, 'repair_after_product_save'], 99);
+		add_action('load-post.php', [self::class, 'repair_on_product_screen']);
+		add_action('admin_notices', [self::class, 'maybe_show_repaired_notice']);
+	}
+
+	/**
+	 * Makes a product's `product_type` term match its Chamilo meta
+	 * (`_chamilo_course_id` => chamilo_course, `_chamilo_session_id` =>
+	 * chamilo_session). No-op for a product with neither meta.
+	 *
+	 * @return bool True if the term was stale and has been rewritten.
+	 */
+	public static function repair_product_type_term(int $product_id): bool
+	{
+		if ($product_id <= 0) {
+			return false;
+		}
+
+		if ((int) get_post_meta($product_id, '_chamilo_course_id', true) > 0) {
+			$expected = 'chamilo_course';
+		} elseif ((int) get_post_meta($product_id, '_chamilo_session_id', true) > 0) {
+			$expected = 'chamilo_session';
+		} else {
+			return false;
+		}
+
+		$current = wp_get_object_terms($product_id, 'product_type', ['fields' => 'slugs']);
+		if (!is_wp_error($current) && [$expected] === array_values($current)) {
+			return false;
+		}
+
+		wp_set_object_terms($product_id, [$expected], 'product_type');
+		clean_post_cache($product_id);
+		if (function_exists('wc_delete_product_transients')) {
+			wc_delete_product_transients($product_id);
+		}
+
+		if (defined('WP_DEBUG') && WP_DEBUG) {
+			error_log(sprintf('[Chamilo] repaired stale product_type term on product #%d (was "%s", now "%s")', $product_id, is_wp_error($current) ? '?' : implode(',', $current), $expected));
+		}
+
+		return true;
+	}
+
+	public static function repair_after_product_save(int $post_id): void
+	{
+		if (self::repair_product_type_term($post_id)) {
+			set_transient('chamilo_repaired_product_'.get_current_user_id(), $post_id, 60);
+		}
+	}
+
+	public static function repair_on_product_screen(): void
+	{
+		$post_id = isset($_GET['post']) ? absint($_GET['post']) : 0; // phpcs:ignore WordPress.Security.NonceVerification
+		if ($post_id > 0 && 'product' === get_post_type($post_id) && self::repair_product_type_term($post_id)) {
+			set_transient('chamilo_repaired_product_'.get_current_user_id(), $post_id, 60);
+		}
+	}
+
+	public static function maybe_show_repaired_notice(): void
+	{
+		$key = 'chamilo_repaired_product_'.get_current_user_id();
+		$post_id = (int) get_transient($key);
+		if ($post_id <= 0) {
+			return;
+		}
+		delete_transient($key);
+
+		printf(
+			'<div class="notice notice-warning is-dismissible"><p>%s</p></div>',
+			esc_html(sprintf(
+				/* translators: %d: product id */
+				__('Chamilo: product #%d had lost its Chamilo product type (WooCommerce had reset it to "simple"). It has been restored; reload this screen if the Chamilo fields are missing.', 'chamilo'),
+				$post_id
+			))
+		);
 	}
 
 	public static function map_product_class(string $classname, string $product_type): string

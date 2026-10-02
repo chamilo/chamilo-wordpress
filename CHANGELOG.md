@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Public, Open, Private and Closed, applied to the sync. Open and Private are checked by
   default; Hidden courses are never synced. It does not apply to sessions.
 
+### Fixed
+
+- Orders for a synced product were skipped (no enrollment) whenever WooCommerce had reset the
+  product's type to "simple", which happens when a synced product is saved from the product
+  edit screen. Order items are now recognized as Chamilo items from the product's
+  `_chamilo_course_id` / `_chamilo_session_id` meta instead of its WooCommerce type, and
+  enrollment and the "Continue to your course" link use that meta too.
+- The product type is now restored automatically after a product save, when a product's edit
+  screen is opened (with an admin notice), when an order is processed, and for every product
+  carrying Chamilo meta at the end of each sync.
+
 ### Changed
 
 - A `price` extra field is no longer required for a course or session to sync. Every course

@@ -57,45 +57,25 @@ class Chamilo_Enrollment
 
 			$is_chamilo_item = Chamilo_Order_Meta::is_chamilo_item($item);
 
+			// Enrollment is keyed off the product's Chamilo meta, so a stale WooCommerce
+			// product_type term no longer blocks it — but repair the term anyway so the
+			// rest of the plugin (product screen, metabox) sees the product correctly.
+			$term_repaired = $is_chamilo_item && Chamilo_Product_Types::repair_product_type_term($item->get_product_id());
+
 			if (defined('WP_DEBUG') && WP_DEBUG) {
 				$product = $item->get_product();
-				$product_id = $product instanceof WC_Product ? $product->get_id() : 0;
+				$target = Chamilo_Order_Meta::resolve_target($item);
 				error_log(sprintf(
-					'[Chamilo] handle_order_completed: order #%d item #%d "%s" -> product_id=%d, product_type=%s, is_chamilo_item=%s',
+					'[Chamilo] handle_order_completed: order #%d item #%d "%s" -> product_id=%d, woocommerce product_type=%s, chamilo target=%s, is_chamilo_item=%s%s',
 					$order_id,
 					$item->get_id(),
 					$item->get_name(),
-					$product_id,
+					$item->get_product_id(),
 					$product instanceof WC_Product ? $product->get_type() : 'n/a (product not found)',
-					$is_chamilo_item ? 'true' : 'false'
+					null === $target ? '(none - no _chamilo_course_id/_chamilo_session_id meta)' : $target['type'].' #'.$target['id'],
+					$is_chamilo_item ? 'true' : 'false',
+					$term_repaired ? ' -- its product_type term was stale and has been repaired' : ''
 				));
-
-				// A product carrying Chamilo meta but NOT resolving as chamilo_course/
-				// chamilo_session is the known "stale product_type term" bug (see D.4 in
-				// README.md): WooCommerce only re-writes that taxonomy term when a
-				// product is first created, so a term that went wrong at some point
-				// stays wrong until the next sync's force_product_type_term() call.
-				// Logging the raw postmeta (independent of which PHP class WooCommerce
-				// decided to instantiate) and the raw taxonomy term(s) makes that
-				// diagnosis possible straight from this log line, without needing to
-				// separately inspect the product edit screen.
-				if (!$is_chamilo_item && $product_id > 0) {
-					$raw_course_id = get_post_meta($product_id, '_chamilo_course_id', true);
-					$raw_session_id = get_post_meta($product_id, '_chamilo_session_id', true);
-					$raw_terms = wp_get_object_terms($product_id, 'product_type', ['fields' => 'names']);
-					error_log(sprintf(
-						'[Chamilo] handle_order_completed: order #%d item #%d -> product_id=%d carries _chamilo_course_id=%s, _chamilo_session_id=%s, raw product_type term(s)=%s%s',
-						$order_id,
-						$item->get_id(),
-						$product_id,
-						'' !== (string) $raw_course_id ? $raw_course_id : '(none)',
-						'' !== (string) $raw_session_id ? $raw_session_id : '(none)',
-						is_wp_error($raw_terms) ? 'ERROR: '.$raw_terms->get_error_message() : implode(',', $raw_terms),
-						('' !== (string) $raw_course_id || '' !== (string) $raw_session_id)
-							? ' -- this product WAS synced by Chamilo; its product_type term is stale. Re-run Sync now, then Retry enrollment on this order.'
-							: ' -- this product has no Chamilo meta at all; it is genuinely not a Chamilo item.'
-					));
-				}
 			}
 
 			if (!$is_chamilo_item) {
@@ -126,10 +106,13 @@ class Chamilo_Enrollment
 			return;
 		}
 
-		$product_type = 'chamilo_course' === $product->get_type() ? 'course' : 'session';
-		$chamilo_id = 'chamilo_course' === $product->get_type()
-			? $product->get_chamilo_course_id()
-			: $product->get_chamilo_session_id();
+		$target = Chamilo_Order_Meta::resolve_target($item);
+		if (null === $target) {
+			return; // Not a Chamilo product (callers already check is_chamilo_item()).
+		}
+
+		$product_type = $target['type'];
+		$chamilo_id = $target['id'];
 
 		if (defined('WP_DEBUG') && WP_DEBUG) {
 			error_log(sprintf(
@@ -398,12 +381,16 @@ class Chamilo_Enrollment
 			return null;
 		}
 
-		if ($product instanceof WC_Product_Chamilo_Course) {
-			$target = '/courses/'.rawurlencode($product->get_chamilo_course_code()).'/index.php';
-		} elseif ($product instanceof WC_Product_Chamilo_Session) {
-			$target = '/sessions';
-		} else {
+		$chamilo = Chamilo_Order_Meta::resolve_target($item);
+		if (null === $chamilo) {
 			return null;
+		}
+
+		if ('course' === $chamilo['type']) {
+			$code = (string) get_post_meta($item->get_product_id(), '_chamilo_course_code', true);
+			$target = '/courses/'.rawurlencode($code).'/index.php';
+		} else {
+			$target = '/sessions';
 		}
 
 		return $base_url.'/login?redirect='.rawurlencode($target);
