@@ -6,9 +6,13 @@
  *
  * Courses and sessions are synced symmetrically, both read from their plain
  * authenticated collection endpoint (`/api/courses`, `/api/sessions`) rather than
- * Chamilo's own public-catalog machinery, and both gated only by:
- *   (a) `price` being set (via the ExtraFieldValues bulk-read pattern, §5.1.1), and
- *   (b) `visibility` excluding the "hidden"-equivalent value.
+ * Chamilo's own public-catalog machinery, and both gated only by `visibility`
+ * excluding the closed/hidden-equivalent values.
+ *
+ * `price` is optional: when the `price` extra field is defined and an item has a
+ * value for it (read via the ExtraFieldValues bulk-read pattern, §5.1.1), that
+ * value becomes the product's regular price; otherwise the product is still
+ * synced, with no price, for the WP admin to fill in (or not) before publishing.
  * `show_in_catalogue` is not read at all — the service account has admin-equivalent
  * access already, so it sees every non-hidden course/session regardless of that
  * flag; requiring it too would just duplicate a decision that belongs in WordPress.
@@ -77,6 +81,8 @@ class Chamilo_Catalog_Sync
 
 		$access_url_id = Chamilo_Settings::get_access_url_id();
 
+		// A missing `price` field (or a missing value for one item) is not an error:
+		// those items just sync without a price.
 		$course_price_values = self::fetch_field_values($client, 'price', 2);
 		if (is_wp_error($course_price_values)) {
 			return self::finish_with_error($course_price_values);
@@ -102,10 +108,9 @@ class Chamilo_Catalog_Sync
 			$course_id = (int) ($course['id'] ?? 0);
 			$visibility = (int) ($course['visibility'] ?? -1);
 			if (0 === $course_id
-				|| !isset($course_price_values[$course_id])
 				|| in_array($visibility, self::COURSE_HIDDEN_VISIBILITIES, true)
 			) {
-				continue; // No price set, or Closed/Hidden: not for sale.
+				continue; // Closed/Hidden: not for sale.
 			}
 
 			// Course.description (the plain field /api/courses itself returns) is
@@ -119,7 +124,7 @@ class Chamilo_Catalog_Sync
 			$course['description'] = self::fetch_course_description($client, $course_id, (string) ($course['description'] ?? ''));
 
 			try {
-				self::upsert_course($client, $course, (float) $course_price_values[$course_id], $access_url_id);
+				self::upsert_course($client, $course, self::parse_price($course_price_values[$course_id] ?? null), $access_url_id);
 				++$courses_synced;
 			} catch (\Throwable $e) {
 				$failures[] = self::log_item_failure('course', $course_id, $e);
@@ -136,17 +141,16 @@ class Chamilo_Catalog_Sync
 			$session_id = (int) ($session['id'] ?? 0);
 			$visibility = (int) ($session['visibility'] ?? -1);
 			if (0 === $session_id
-				|| !isset($session_price_values[$session_id])
 				|| in_array($visibility, self::SESSION_HIDDEN_VISIBILITIES, true)
 			) {
-				continue; // No price set, or Invisible: not for sale.
+				continue; // Invisible: not for sale.
 			}
 
 			// The bulk collection (/api/sessions) deliberately omits
 			// displayStartDate/displayEndDate/duration — Chamilo's own GetCollection
 			// operation is kept lean on purpose; the single-item endpoint carries
 			// the fuller set. One extra call per
-			// *eligible* session only (after the price/visibility filter above,
+			// *eligible* session only (after the visibility filter above,
 			// not for every session in the catalog) — acceptable at the catalog
 			// sizes this plugin targets (get_all()'s own docblock: hundreds, not
 			// tens of thousands). Best-effort: if this call fails, fall back to
@@ -166,7 +170,7 @@ class Chamilo_Catalog_Sync
 			}
 
 			try {
-				self::upsert_session($client, $session, (float) $session_price_values[$session_id], $access_url_id);
+				self::upsert_session($client, $session, self::parse_price($session_price_values[$session_id] ?? null), $access_url_id);
 				++$sessions_synced;
 			} catch (\Throwable $e) {
 				$failures[] = self::log_item_failure('session', $session_id, $e);
@@ -300,9 +304,25 @@ class Chamilo_Catalog_Sync
 	}
 
 	/**
+	 * Turns a raw `price` extra-field value into a float, or null when there is no
+	 * usable value (field undefined, no value for this item, blank, or non-numeric)
+	 * — in which case the product's existing price is left untouched.
+	 */
+	private static function parse_price(?string $raw): ?float
+	{
+		$raw = trim((string) $raw);
+		if ('' === $raw) {
+			return null;
+		}
+		$raw = str_replace(',', '.', $raw);
+
+		return is_numeric($raw) ? (float) $raw : null;
+	}
+
+	/**
 	 * @param array<string, mixed> $course
 	 */
-	private static function upsert_course(Chamilo_Api_Client $client, array $course, float $price, int $access_url_id): void
+	private static function upsert_course(Chamilo_Api_Client $client, array $course, ?float $price, int $access_url_id): void
 	{
 		$course_id = (int) $course['id'];
 		$product = self::find_product('_chamilo_course_id', $course_id, WC_Product_Chamilo_Course::class);
@@ -329,7 +349,7 @@ class Chamilo_Catalog_Sync
 			$product->set_status('draft');
 		}
 
-		if (!$product->is_chamilo_price_override_locked()) {
+		if (null !== $price && !$product->is_chamilo_price_override_locked()) {
 			$product->set_regular_price((string) $price);
 		}
 
@@ -370,7 +390,7 @@ class Chamilo_Catalog_Sync
 	/**
 	 * @param array<string, mixed> $session
 	 */
-	private static function upsert_session(Chamilo_Api_Client $client, array $session, float $price, int $access_url_id): void
+	private static function upsert_session(Chamilo_Api_Client $client, array $session, ?float $price, int $access_url_id): void
 	{
 		$session_id = (int) $session['id'];
 		$product = self::find_product('_chamilo_session_id', $session_id, WC_Product_Chamilo_Session::class);
@@ -395,7 +415,7 @@ class Chamilo_Catalog_Sync
 			$product->set_status('draft'); // Same reasoning as upsert_course() — see there.
 		}
 
-		if (!$product->is_chamilo_price_override_locked()) {
+		if (null !== $price && !$product->is_chamilo_price_override_locked()) {
 			$product->set_regular_price((string) $price);
 		}
 
