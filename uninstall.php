@@ -17,6 +17,7 @@ $chamilo_wc_options = [
 	'chamilo_wp_access_url_id',
 	'chamilo_wp_sync_interval',
 	'chamilo_wp_default_product_category_id',
+	'chamilo_wp_course_visibilities',
 	'chamilo_wp_last_sync_at',
 	'chamilo_wp_last_sync_status',
 ];

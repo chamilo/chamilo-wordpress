@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Course visibilities to sync** setting (WooCommerce → Settings → Chamilo): checkboxes for
+  Public, Open, Private and Closed, applied to the sync. Open and Private are checked by
+  default; Hidden courses are never synced. It does not apply to sessions.
+
 ### Changed
 
 - A `price` extra field is no longer required for a course or session to sync. Every course

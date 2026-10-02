@@ -26,8 +26,23 @@ if (!defined('ABSPATH')) {
 
 class Chamilo_Settings
 {
+	/**
+	 * Chamilo course visibility values an admin can choose to sync, as
+	 * value => label. Course::HIDDEN (4) is deliberately absent: it is never synced.
+	 */
+	public const COURSE_VISIBILITY_CHOICES = [
+		3 => 'Public (open to the world)',
+		2 => 'Open (open to platform users)',
+		1 => 'Private (registered users only)',
+		0 => 'Closed',
+	];
+
+	/** Synced when the admin has never saved a choice: Open and Private. */
+	private const DEFAULT_COURSE_VISIBILITIES = [2, 1];
+
 	public static function init(): void
 	{
+		add_action('woocommerce_admin_field_chamilo_course_visibilities', [self::class, 'render_course_visibilities_field']);
 		add_filter('woocommerce_settings_tabs_array', [self::class, 'add_settings_tab'], 50);
 		add_action('woocommerce_settings_tabs_chamilo', [self::class, 'render_settings_page']);
 		add_action('woocommerce_update_options_chamilo', [self::class, 'save_settings']);
@@ -133,6 +148,7 @@ class Chamilo_Settings
 	public static function save_settings(): void
 	{
 		woocommerce_update_options(self::get_fields());
+		self::save_course_visibilities();
 		self::encrypt_stored_api_key();
 		self::reschedule_sync();
 	}
@@ -293,6 +309,12 @@ class Chamilo_Settings
 				],
 			],
 			[
+				'title' => __('Course visibilities to sync', 'chamilo'),
+				'id' => 'chamilo_wp_course_visibilities',
+				'type' => 'chamilo_course_visibilities',
+				'desc' => __('Only courses with a checked visibility are pulled from Chamilo. Hidden courses are never synced.', 'chamilo'),
+			],
+			[
 				'title' => __('Default product category', 'chamilo'),
 				'id' => 'chamilo_wp_default_product_category_id',
 				'type' => 'select',
@@ -351,6 +373,65 @@ class Chamilo_Settings
 	public static function get_sync_interval(): string
 	{
 		return (string) get_option('chamilo_wp_sync_interval', 'hourly');
+	}
+
+	/**
+	 * Custom WooCommerce Settings API field type: one checkbox per syncable course
+	 * visibility. Rendered via the woocommerce_admin_field_{type} action.
+	 *
+	 * @param array<string, mixed> $field
+	 */
+	public static function render_course_visibilities_field(array $field): void
+	{
+		$selected = self::get_course_visibilities();
+		?>
+		<tr valign="top">
+			<th scope="row" class="titledesc"><?php echo esc_html((string) $field['title']); ?></th>
+			<td class="forminp">
+				<?php foreach (self::COURSE_VISIBILITY_CHOICES as $value => $label) : ?>
+					<label style="display:block;margin-bottom:4px;">
+						<input type="checkbox" name="chamilo_wp_course_visibilities[]"
+							value="<?php echo esc_attr((string) $value); ?>"
+							<?php checked(in_array($value, $selected, true)); ?>>
+						<?php echo esc_html(__($label, 'chamilo')); // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText ?>
+					</label>
+				<?php endforeach; ?>
+				<p class="description"><?php echo esc_html((string) $field['desc']); ?></p>
+			</td>
+		</tr>
+		<?php
+	}
+
+	/**
+	 * Saved by hand rather than through woocommerce_update_options(): an
+	 * all-unchecked group posts nothing at all, which must mean "none selected",
+	 * not "leave the previous value".
+	 */
+	private static function save_course_visibilities(): void
+	{
+		$posted = isset($_POST['chamilo_wp_course_visibilities']) // phpcs:ignore WordPress.Security.NonceVerification -- verified by WooCommerce before this hook fires.
+			? (array) wp_unslash($_POST['chamilo_wp_course_visibilities']) // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput
+			: [];
+
+		$values = array_values(array_intersect(
+			array_map('intval', $posted),
+			array_keys(self::COURSE_VISIBILITY_CHOICES)
+		));
+
+		update_option('chamilo_wp_course_visibilities', $values);
+	}
+
+	/**
+	 * @return array<int, int> Chamilo course visibility values to sync.
+	 */
+	public static function get_course_visibilities(): array
+	{
+		$stored = get_option('chamilo_wp_course_visibilities', null);
+		if (!is_array($stored)) {
+			return self::DEFAULT_COURSE_VISIBILITIES;
+		}
+
+		return array_values(array_intersect(array_map('intval', $stored), array_keys(self::COURSE_VISIBILITY_CHOICES)));
 	}
 
 	public static function get_default_category_id(): int

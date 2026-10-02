@@ -6,8 +6,9 @@
  *
  * Courses and sessions are synced symmetrically, both read from their plain
  * authenticated collection endpoint (`/api/courses`, `/api/sessions`) rather than
- * Chamilo's own public-catalog machinery, and both gated only by `visibility`
- * excluding the closed/hidden-equivalent values.
+ * Chamilo's own public-catalog machinery. Courses are gated only by `visibility`
+ * (the admin-selected set from the settings screen, never Hidden); sessions by
+ * `visibility` excluding Invisible.
  *
  * `price` is optional: when the `price` extra field is defined and an item has a
  * value for it (read via the ExtraFieldValues bulk-read pattern, §5.1.1), that
@@ -52,7 +53,6 @@ if (!defined('ABSPATH')) {
 
 class Chamilo_Catalog_Sync
 {
-	private const COURSE_HIDDEN_VISIBILITIES = [0, 4]; // Course::CLOSED, Course::HIDDEN
 	private const SESSION_HIDDEN_VISIBILITIES = [3];   // Session::INVISIBLE
 
 	// Course::REGISTERED/OPEN_PLATFORM/OPEN_WORLD only — CLOSED/HIDDEN never reach
@@ -102,15 +102,19 @@ class Chamilo_Catalog_Sync
 			return self::finish_with_error($courses);
 		}
 
+		// Which course visibilities to pull is an admin setting (Course::HIDDEN is
+		// never selectable, so it is never synced).
+		$wanted_visibilities = Chamilo_Settings::get_course_visibilities();
+
 		$courses_synced = 0;
 		$failures = [];
 		foreach ($courses as $course) {
 			$course_id = (int) ($course['id'] ?? 0);
 			$visibility = (int) ($course['visibility'] ?? -1);
 			if (0 === $course_id
-				|| in_array($visibility, self::COURSE_HIDDEN_VISIBILITIES, true)
+				|| !in_array($visibility, $wanted_visibilities, true)
 			) {
-				continue; // Closed/Hidden: not for sale.
+				continue; // Hidden, or a visibility not selected in the settings.
 			}
 
 			// Course.description (the plain field /api/courses itself returns) is

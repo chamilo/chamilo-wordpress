@@ -69,7 +69,8 @@ required, all default off/permissive:
   visibility from the catalog.
 
 A course's own **Visibility** setting still matters regardless of any of the
-above - Closed/Hidden courses are never synced.
+above: only the visibilities checked under **Course visibilities to sync** in the
+plugin's settings (see Part C) are pulled, and Hidden courses are never synced.
 
 ### A.2 - Create the "price" field (optional)
 
@@ -90,13 +91,13 @@ page (see A.3) - not from this admin screen, which only defines the field itself
 
 ### A.3 - Choose which courses/sessions to sell
 
-Every course and session that isn't Closed/Hidden is synced. For **each** one you
-want to sell:
+Every course whose visibility is checked in the plugin's settings (Part C), and
+every session that isn't Invisible, is synced. For **each** one you want to sell:
 
 1. Open the course (**Course edit page**) or session (**Session edit page**) in
    Chamilo.
-2. Set **Visibility** to anything other than *Closed* or *Hidden* (courses) /
-   *Invisible* (sessions) - the plugin skips those.
+2. Set **Visibility** to one the plugin is set to sync (courses; by default
+   *Open* and *Private*) or anything other than *Invisible* (sessions).
 3. Optionally, fill in the **price** extra field (see A.2) with a positive number
    (in your shop's currency - the plugin doesn't convert currencies).
 
@@ -106,8 +107,8 @@ Chamilo visibility is shown on the product so you can judge whether it's the kin
 of course that *should* be sellable (e.g. a "Registered users only" course syncing
 in is worth a second look before publishing it to the public storefront).
 
-A Closed/Hidden course (or Invisible session) simply won't be pulled into
-WooCommerce - nothing breaks, it's just skipped. See the
+A course with an unchecked visibility (or Hidden), or an Invisible session,
+simply won't be pulled into WooCommerce - nothing breaks, it's just skipped. See the
 troubleshooting checklist in D.4 if something you expected to see isn't showing
 up.
 
@@ -173,10 +174,13 @@ Before moving to WordPress, write down:
 ## Part C - Connect WordPress to Chamilo
 
 1. Go to **WooCommerce → Settings → Chamilo** (a new tab the plugin adds).
-2. Fill in the three values you noted in A.6:
+2. Fill in the three values you noted in A.6, and optionally the visibility filter:
    - **Chamilo base URL**
    - **External API key**
    - **Access URL / portal ID**
+   - **Course visibilities to sync** (optional) - which Chamilo course
+     visibilities to pull: Public, Open, Private, Closed. *Open* and *Private* are
+     checked by default; Hidden courses are never synced. Applies to courses only.
 3. Click **Test connection**. This confirms the key is valid and Chamilo is
    reachable before you save - if it fails, double-check the URL (must be
    reachable from your WordPress server, not just your browser) and that the key
@@ -190,7 +194,7 @@ At this point WordPress can talk to Chamilo, but nothing has been synced yet.
 ### D.1 - Run the first sync
 
 1. Still under **WooCommerce → Settings → Chamilo**, click **Sync now**.
-2. The plugin pulls every course and session that isn't Closed/Hidden (A.3),
+2. The plugin pulls every course with a selected visibility and every non-Invisible session (A.3),
    and creates one WooCommerce product per item (product type `chamilo_course` or
    `chamilo_session`), as a **draft** - not published — so you can review each one
    before it's actually purchasable. This casts a wide net deliberately: the
@@ -265,7 +269,7 @@ Check, in order:
 
 | Check | Where |
 |---|---|
-| Is the course/session visibility *not* Closed/Hidden (courses) or Invisible (sessions)? | Chamilo: course/session edit page |
+| Is the course's visibility checked under **Course visibilities to sync** (and not Hidden), or the session not Invisible? | WordPress: settings tab; Chamilo: course/session edit page |
 | Did a sync actually run since you made the change? | WordPress: WooCommerce → Settings → Chamilo → last sync time; click **Sync now** |
 | Is it there as a **draft**, just not published? | WordPress: Products list - filter by "Draft"; this is the most common "missing" course — it synced, it's just not live yet (see D.1) |
 | Does the service account still have a valid, non-revoked API key? | WordPress: **Test connection** button |
@@ -380,7 +384,7 @@ screen for exactly this).
   session access dates/duration).
 - `includes/class-chamilo-catalog-sync.php` - the sync engine: courses and
   sessions both read from their plain authenticated collection (`/api/courses`,
-  `/api/sessions`), gated only by `visibility` excluding the hidden-equivalent value; the
+  `/api/sessions`), gated only by `visibility` (courses: the admin-selected set, never Hidden; sessions: not Invisible); the
   optional `price` extra field is read via the `ExtraFieldValues` bulk-read
   pattern. New products
   sync in as **drafts**. Course descriptions come from Chamilo's Course
