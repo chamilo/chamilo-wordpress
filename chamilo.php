@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Chamilo Storefront for WooCommerce
  * Description: Sells Chamilo courses and sessions through WooCommerce — pulls a catalog from a Chamilo v3 portal into WooCommerce products, and pushes enrollment back to Chamilo when an order completes.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Requires at least: 6.9
  * Requires PHP: 8.2
  * WC requires at least: 8.0
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
 	die;
 }
 
-define('CHAMILO_WC_VERSION', '1.0.1');
+define('CHAMILO_WC_VERSION', '1.0.2');
 define('CHAMILO_WC_PLUGIN_FILE', __FILE__);
 define('CHAMILO_WC_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('CHAMILO_WC_PLUGIN_URL', plugin_dir_url(__FILE__));

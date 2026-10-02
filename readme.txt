@@ -4,7 +4,7 @@ Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.2
 WC requires at least: 8.0
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -28,6 +28,13 @@ of what's implemented.
 4. Click "Test connection", then "Sync now".
 
 == Changelog ==
+
+= 1.0.2 =
+* New: "Course visibilities to sync" setting (Public, Open, Private, Closed; Open and Private by default).
+* Change: a `price` extra field is no longer required for a course or session to sync.
+* Fix: orders for a synced product were skipped when WooCommerce had reset its product type to
+  "simple"; products are now recognized from their Chamilo meta and the type is restored automatically.
+  See CHANGELOG.md for detail.
 
 = 1.0.1 =
 * Fix: saving the settings screen fataled with "SodiumException: unsupported key length" — the

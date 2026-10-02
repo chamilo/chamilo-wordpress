@@ -5,7 +5,7 @@ All notable changes to this plugin are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.2] - 2026-10-03
 
 ### Added
 
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A `price` extra field is no longer required for a course or session to sync. Every course
-  and session that isn't Closed/Hidden (courses) or Invisible (sessions) is now synced; the
+  with a selected visibility and every session that isn't Invisible is now synced; the
   `price` extra field is optional, and an item without one (or on a portal where the field
   isn't defined) syncs with no price instead of being skipped. Previously such a portal
   reported "Synced 0 course(s), 0 session(s)" with no error.
